@@ -8,6 +8,22 @@ The service uses SQLite for local persistence, so links remain available after t
 
 https://abdullah-shortlink.up.railway.app
 
+Try encoding a URL:
+
+```sh
+curl -s https://abdullah-shortlink.up.railway.app/encode \
+  -H "Content-Type: application/json" \
+  -d '{"url":"https://codesubmit.io/library/react"}'
+```
+
+Then decode the returned `short_url`:
+
+```sh
+curl -s https://abdullah-shortlink.up.railway.app/decode \
+  -H "Content-Type: application/json" \
+  -d '{"short_url":"https://abdullah-shortlink.up.railway.app/<code>"}'
+```
+
 ## Running Instructions
 
 See [RUNNING_INSTRUCTIONS.md](RUNNING_INSTRUCTIONS.md) for setup, run, test, manual verification, and cleanup steps.
