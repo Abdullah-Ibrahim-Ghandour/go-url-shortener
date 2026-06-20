@@ -4,32 +4,9 @@ A small URL shortening service written in Go. It exposes JSON endpoints to encod
 
 The service uses SQLite for local persistence, so links remain available after the process restarts.
 
-## Prerequisites
+## Running Instructions
 
-- Go 1.26 or newer
-
-## Run
-
-```sh
-go run ./cmd/shortlink
-```
-
-By default, the server listens on port `8080` and stores data in `data/shortlink.db`.
-
-```text
-SHORTLINK_ADDR=:8080
-SHORTLINK_BASE_URL=http://localhost:8080
-SHORTLINK_DB_PATH=data/shortlink.db
-```
-
-`SHORTLINK_ADDR` controls where the HTTP server listens. `SHORTLINK_BASE_URL` controls what public URL is returned in encode responses.
-
-## Test
-
-```sh
-go test ./...
-go build ./...
-```
+See [RUNNING_INSTRUCTIONS.md](RUNNING_INSTRUCTIONS.md) for setup, run, test, manual verification, and cleanup steps.
 
 ## API
 
