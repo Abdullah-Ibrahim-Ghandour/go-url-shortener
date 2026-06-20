@@ -4,6 +4,10 @@ A small URL shortening service written in Go. It exposes JSON endpoints to encod
 
 The service uses SQLite for local persistence, so links remain available after the process restarts.
 
+## Live Demo
+
+https://abdullah-shortlink.up.railway.app
+
 ## Running Instructions
 
 See [RUNNING_INSTRUCTIONS.md](RUNNING_INSTRUCTIONS.md) for setup, run, test, manual verification, and cleanup steps.
