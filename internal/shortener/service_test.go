@@ -44,6 +44,26 @@ func TestServiceEncodeIsIdempotent(t *testing.T) {
 	}
 }
 
+func TestServiceReturnsExistingURLWhenConcurrentInsertCreatesOriginalURL(t *testing.T) {
+	store := &concurrentOriginalURLStore{
+		existing: Link{
+			Code:        "Ab3dE9xY",
+			OriginalURL: "https://example.com/articles/1",
+			CreatedAt:   time.Now().UTC(),
+		},
+	}
+	service := newTestService(t, store, "Zx9Wv8Ut")
+
+	shortURL, err := service.Encode(context.Background(), "https://example.com/articles/1")
+	if err != nil {
+		t.Fatalf("encode URL after concurrent insert: %v", err)
+	}
+
+	if shortURL != "http://localhost:8080/Ab3dE9xY" {
+		t.Fatalf("short URL = %q; want %q", shortURL, "http://localhost:8080/Ab3dE9xY")
+	}
+}
+
 func TestServiceDecodeReturnsOriginalURL(t *testing.T) {
 	store := newMemoryStore()
 	service := newTestService(t, store, "Ab3dE9xY")
@@ -239,4 +259,33 @@ func (s *memoryStore) mustInsert(t *testing.T, link Link) {
 		t.Fatal("fixture was not inserted")
 	}
 	s.insertCalls = 0
+}
+
+type concurrentOriginalURLStore struct {
+	existing  Link
+	findCalls int
+}
+
+func (s *concurrentOriginalURLStore) FindByOriginalURL(_ context.Context, originalURL string) (Link, error) {
+	s.findCalls++
+	if s.findCalls == 1 {
+		return Link{}, ErrNotFound
+	}
+	if originalURL != s.existing.OriginalURL {
+		return Link{}, ErrNotFound
+	}
+
+	return s.existing, nil
+}
+
+func (s *concurrentOriginalURLStore) FindByCode(_ context.Context, code string) (Link, error) {
+	if code != s.existing.Code {
+		return Link{}, ErrNotFound
+	}
+
+	return s.existing, nil
+}
+
+func (s *concurrentOriginalURLStore) Insert(context.Context, Link) (bool, error) {
+	return false, nil
 }

@@ -91,6 +91,14 @@ func (s *Service) Encode(ctx context.Context, rawURL string) (string, error) {
 		if inserted {
 			return s.shortURL(code), nil
 		}
+
+		existing, err := s.store.FindByOriginalURL(ctx, originalURL)
+		if err == nil {
+			return s.shortURL(existing.Code), nil
+		}
+		if !errors.Is(err, ErrNotFound) {
+			return "", fmt.Errorf("find existing URL after insert miss: %w", err)
+		}
 	}
 
 	return "", ErrCodeExhausted
