@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Go URL Shortener</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f6f7f9;
+      --panel: #ffffff;
+      --text: #1d2433;
+      --muted: #667085;
+      --border: #d7dce5;
+      --primary: #1f6feb;
+      --primary-hover: #195fc9;
+      --danger: #b42318;
+      --success: #067647;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Arial, Helvetica, sans-serif;
+      line-height: 1.5;
+    }
+
+    main {
+      width: min(920px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 40px 0;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 32px;
+      line-height: 1.2;
+    }
+
+    .intro {
+      margin: 0 0 28px;
+      color: var(--muted);
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 20px;
+    }
+
+    section {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px;
+    }
+
+    h2 {
+      margin: 0 0 16px;
+      font-size: 20px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 600;
+    }
+
+    input {
+      width: 100%;
+      height: 44px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0 12px;
+      font: inherit;
+    }
+
+    input:focus {
+      border-color: var(--primary);
+      outline: 3px solid rgba(31, 111, 235, 0.15);
+    }
+
+    button {
+      height: 42px;
+      border: 0;
+      border-radius: 6px;
+      background: var(--primary);
+      color: #ffffff;
+      cursor: pointer;
+      font: inherit;
+      font-weight: 600;
+      padding: 0 16px;
+    }
+
+    button:hover {
+      background: var(--primary-hover);
+    }
+
+    button.secondary {
+      background: #eef2f7;
+      color: var(--text);
+    }
+
+    button.secondary:hover {
+      background: #e4e9f2;
+    }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 14px;
+      flex-wrap: wrap;
+    }
+
+    .result {
+      min-height: 48px;
+      margin-top: 16px;
+      border-radius: 6px;
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      padding: 12px;
+      overflow-wrap: anywhere;
+    }
+
+    .result:empty {
+      display: none;
+    }
+
+    .result a {
+      color: var(--primary);
+      font-weight: 600;
+    }
+
+    .status {
+      min-height: 24px;
+      margin-top: 10px;
+      color: var(--muted);
+    }
+
+    .status.error {
+      color: var(--danger);
+    }
+
+    .status.success {
+      color: var(--success);
+    }
+
+    @media (max-width: 760px) {
+      main {
+        width: min(100% - 24px, 920px);
+        padding: 24px 0;
+      }
+
+      .grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Go URL Shortener</h1>
+    <p class="intro">Shorten a URL, resolve an existing short URL, or open a short URL to follow its redirect.</p>
+
+    <div class="grid">
+      <section>
+        <h2>Shorten URL</h2>
+        <form id="encode-form">
+          <label for="url">Original URL</label>
+          <input id="url" name="url" type="url" placeholder="https://example.com/article" required>
+          <div class="actions">
+            <button type="submit">Shorten</button>
+            <button class="secondary" id="copy-short-url" type="button" hidden>Copy</button>
+          </div>
+        </form>
+        <div class="result" id="encode-result" aria-live="polite"></div>
+        <div class="status" id="encode-status" aria-live="polite"></div>
+      </section>
+
+      <section>
+        <h2>Resolve Short URL</h2>
+        <form id="decode-form">
+          <label for="short-url">Short URL</label>
+          <input id="short-url" name="short_url" type="url" placeholder="https://abdullah-shortlink.up.railway.app/Ab3dE9xY" required>
+          <div class="actions">
+            <button type="submit">Resolve</button>
+          </div>
+        </form>
+        <div class="result" id="decode-result" aria-live="polite"></div>
+        <div class="status" id="decode-status" aria-live="polite"></div>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    const encodeForm = document.querySelector("#encode-form");
+    const decodeForm = document.querySelector("#decode-form");
+    const copyButton = document.querySelector("#copy-short-url");
+    const encodeResult = document.querySelector("#encode-result");
+    const decodeResult = document.querySelector("#decode-result");
+    const encodeStatus = document.querySelector("#encode-status");
+    const decodeStatus = document.querySelector("#decode-status");
+    let latestShortURL = "";
+
+    encodeForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      setStatus(encodeStatus, "Shortening...", "");
+      encodeResult.replaceChildren();
+      copyButton.hidden = true;
+
+      const url = new FormData(encodeForm).get("url");
+      const response = await postJSON("/encode", { url });
+      if (!response.ok) {
+        setStatus(encodeStatus, errorMessage(response.body), "error");
+        return;
+      }
+
+      latestShortURL = response.body.short_url;
+      const link = document.createElement("a");
+      link.href = latestShortURL;
+      link.textContent = latestShortURL;
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      encodeResult.replaceChildren(link);
+      copyButton.hidden = false;
+      setStatus(encodeStatus, "Short URL created.", "success");
+    });
+
+    decodeForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      setStatus(decodeStatus, "Resolving...", "");
+      decodeResult.replaceChildren();
+
+      const short_url = new FormData(decodeForm).get("short_url");
+      const response = await postJSON("/decode", { short_url });
+      if (!response.ok) {
+        setStatus(decodeStatus, errorMessage(response.body), "error");
+        return;
+      }
+
+      const link = document.createElement("a");
+      link.href = response.body.url;
+      link.textContent = response.body.url;
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      decodeResult.replaceChildren(link);
+      setStatus(decodeStatus, "Original URL resolved.", "success");
+    });
+
+    copyButton.addEventListener("click", async () => {
+      if (!latestShortURL) return;
+      await navigator.clipboard.writeText(latestShortURL);
+      setStatus(encodeStatus, "Copied to clipboard.", "success");
+    });
+
+    async function postJSON(path, body) {
+      try {
+        const response = await fetch(path, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        const payload = await response.json();
+        return { ok: response.ok, body: payload };
+      } catch {
+        return { ok: false, body: { error: "request_failed" } };
+      }
+    }
+
+    function errorMessage(body) {
+      const messages = {
+        invalid_request: "Request body is invalid.",
+        invalid_url: "Enter a valid http or https URL.",
+        invalid_short_url: "Enter a valid short URL from this service.",
+        not_found: "Short URL was not found.",
+        internal_error: "Server error. Try again later.",
+        request_failed: "Request failed. Check your connection.",
+      };
+      return messages[body.error] || "Unexpected error.";
+    }
+
+    function setStatus(element, message, state) {
+      element.textContent = message;
+      element.className = state ? `status ${state}` : "status";
+    }
+  </script>
+</body>
+</html>

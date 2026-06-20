@@ -68,6 +68,16 @@ $env:SHORTLINK_DB_PATH = "data/local.db"
 go run ./cmd/shortlink
 ```
 
+## Open The Web UI
+
+Open this URL in a browser:
+
+```text
+http://localhost:8080
+```
+
+The page can shorten URLs, resolve short URLs, and open short URLs through the redirect endpoint.
+
 ## Encode A URL
 
 In another terminal, run:

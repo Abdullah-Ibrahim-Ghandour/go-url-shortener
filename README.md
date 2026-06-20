@@ -8,7 +8,9 @@ The service uses SQLite for local persistence, so links remain available after t
 
 https://abdullah-shortlink.up.railway.app
 
-Try encoding a URL:
+Open the live demo in a browser to shorten, resolve, and follow short URLs.
+
+You can also use the JSON API directly. Try encoding a URL:
 
 ```sh
 curl -s https://abdullah-shortlink.up.railway.app/encode \

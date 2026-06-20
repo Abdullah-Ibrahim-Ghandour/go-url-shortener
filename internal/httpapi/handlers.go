@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	_ "embed"
 	"encoding/json"
 	"errors"
 	"io"
@@ -12,6 +13,9 @@ import (
 )
 
 const maxRequestBodyBytes = 16 * 1024
+
+//go:embed index.html
+var indexHTML string
 
 type Shortener interface {
 	Encode(ctx context.Context, rawURL string) (string, error)
@@ -95,6 +99,11 @@ func (h *Handler) redirect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if r.URL.Path == "/" {
+		writeHTML(w, http.StatusOK, indexHTML)
+		return
+	}
+
 	code := strings.TrimPrefix(r.URL.Path, "/")
 	if code == "" || strings.Contains(code, "/") {
 		writeError(w, http.StatusNotFound, "not_found")
@@ -157,4 +166,10 @@ func writeJSON(w http.ResponseWriter, status int, payload any) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(payload)
+}
+
+func writeHTML(w http.ResponseWriter, status int, html string) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(status)
+	_, _ = w.Write([]byte(html))
 }

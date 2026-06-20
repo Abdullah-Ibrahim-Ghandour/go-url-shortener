@@ -64,6 +64,24 @@ func TestRedirectReturnsFound(t *testing.T) {
 	}
 }
 
+func TestHomePageReturnsHTML(t *testing.T) {
+	handler := NewHandler(fakeShortener{})
+
+	response := serve(handler, http.MethodGet, "/", "")
+
+	assertStatus(t, response, http.StatusOK)
+	if got := response.Header().Get("Content-Type"); got != "text/html; charset=utf-8" {
+		t.Fatalf("content type = %q; want %q", got, "text/html; charset=utf-8")
+	}
+	body := response.Body.String()
+	if !strings.Contains(body, "Go URL Shortener") {
+		t.Fatalf("homepage body does not contain app title")
+	}
+	if !strings.Contains(body, "/encode") || !strings.Contains(body, "/decode") {
+		t.Fatalf("homepage body does not contain endpoint usage")
+	}
+}
+
 func TestRejectsWrongMethod(t *testing.T) {
 	handler := NewHandler(fakeShortener{})
 
@@ -97,7 +115,6 @@ func TestRedirectRejectsInvalidPaths(t *testing.T) {
 		name string
 		path string
 	}{
-		{name: "root", path: "/"},
 		{name: "nested path", path: "/Ab3dE9xY/extra"},
 	}
 

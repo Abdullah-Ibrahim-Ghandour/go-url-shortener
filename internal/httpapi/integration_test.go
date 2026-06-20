@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"go-url-shortener/internal/shortener"
@@ -20,6 +21,7 @@ func TestEncodeDecodeAndRedirectIntegrationPersistsAcrossRestart(t *testing.T) {
 	baseURL := "http://localhost:8080"
 
 	server, closeStore := startIntegrationServer(t, dbPath, baseURL)
+	homePageIntegration(t, server.URL)
 	shortURL := encodeIntegrationURL(t, server.URL, originalURL)
 	resolveIntegrationURL(t, server.URL, shortURL, originalURL)
 	redirectIntegrationURL(t, server.URL, shortURL, originalURL)
@@ -32,6 +34,31 @@ func TestEncodeDecodeAndRedirectIntegrationPersistsAcrossRestart(t *testing.T) {
 
 	resolveIntegrationURL(t, restarted.URL, shortURL, originalURL)
 	redirectIntegrationURL(t, restarted.URL, shortURL, originalURL)
+}
+
+func homePageIntegration(t *testing.T, serverURL string) {
+	t.Helper()
+
+	response, err := http.Get(serverURL + "/")
+	if err != nil {
+		t.Fatalf("get homepage: %v", err)
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("homepage status = %d; want %d", response.StatusCode, http.StatusOK)
+	}
+	if response.Header.Get("Content-Type") != "text/html; charset=utf-8" {
+		t.Fatalf("homepage content type = %q; want %q", response.Header.Get("Content-Type"), "text/html; charset=utf-8")
+	}
+
+	var body bytes.Buffer
+	if _, err := body.ReadFrom(response.Body); err != nil {
+		t.Fatalf("read homepage body: %v", err)
+	}
+	if !strings.Contains(body.String(), "Go URL Shortener") {
+		t.Fatalf("homepage body does not contain app title")
+	}
 }
 
 func startIntegrationServer(t *testing.T, dbPath string, baseURL string) (*httptest.Server, func()) {
