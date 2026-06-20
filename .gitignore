@@ -1,0 +1,12 @@
+# Go build outputs
+*.exe
+*.test
+*.out
+coverage.*
+
+# Local runtime data
+data/
+
+# Temporary files
+*.tmp
+*.log
