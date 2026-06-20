@@ -24,13 +24,15 @@ curl -s https://abdullah-shortlink.up.railway.app/decode \
   -d '{"short_url":"https://abdullah-shortlink.up.railway.app/<code>"}'
 ```
 
+Or open the returned `short_url` in a browser to be redirected.
+
 ## Running Instructions
 
 See [RUNNING_INSTRUCTIONS.md](RUNNING_INSTRUCTIONS.md) for setup, run, test, manual verification, and cleanup steps.
 
 ## API
 
-All responses use JSON with `Content-Type: application/json; charset=utf-8`.
+The `/encode` and `/decode` endpoints use JSON with `Content-Type: application/json; charset=utf-8`.
 
 ### Encode
 
@@ -94,6 +96,25 @@ curl -s http://localhost:8080/decode \
   -d '{"short_url":"http://localhost:8080/Ab3dE9xY"}'
 ```
 
+### Redirect
+
+```http
+GET /Ab3dE9xY
+```
+
+Success response:
+
+```http
+302 Found
+Location: https://codesubmit.io/library/react
+```
+
+Example:
+
+```sh
+curl -I http://localhost:8080/Ab3dE9xY
+```
+
 ### Errors
 
 ```json
@@ -108,7 +129,7 @@ curl -s http://localhost:8080/decode \
 | 400 | `invalid_url` | Original URL is empty, too long, malformed, or not `http`/`https`. |
 | 400 | `invalid_short_url` | Short URL does not match this service or has an invalid code. |
 | 404 | `not_found` | Short URL is valid but the code is unknown. |
-| 405 | `method_not_allowed` | Endpoint was called with a non-POST method. |
+| 405 | `method_not_allowed` | Endpoint was called with an unsupported method. |
 | 500 | `internal_error` | Unexpected server-side failure. |
 
 ## Persistence
@@ -147,7 +168,6 @@ Encoding is idempotent: encoding the same original URL again returns the existin
 
 ## Future Improvements
 
-- Add a `GET /{code}` redirect endpoint.
 - Add authentication and administrative controls.
 - Add rate limiting and abuse reporting.
 - Add Docker or deployment configuration.

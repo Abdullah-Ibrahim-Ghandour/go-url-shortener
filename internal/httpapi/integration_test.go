@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"path/filepath"
 	"testing"
 
@@ -13,14 +14,15 @@ import (
 	"go-url-shortener/internal/storage"
 )
 
-func TestEncodeDecodeEndpointIntegrationPersistsAcrossRestart(t *testing.T) {
+func TestEncodeDecodeAndRedirectIntegrationPersistsAcrossRestart(t *testing.T) {
 	dbPath := filepath.Join(t.TempDir(), "links.db")
 	originalURL := "https://codesubmit.io/library/react"
 	baseURL := "http://localhost:8080"
 
 	server, closeStore := startIntegrationServer(t, dbPath, baseURL)
 	shortURL := encodeIntegrationURL(t, server.URL, originalURL)
-	decodeIntegrationURL(t, server.URL, shortURL, originalURL)
+	resolveIntegrationURL(t, server.URL, shortURL, originalURL)
+	redirectIntegrationURL(t, server.URL, shortURL, originalURL)
 	server.Close()
 	closeStore()
 
@@ -28,7 +30,8 @@ func TestEncodeDecodeEndpointIntegrationPersistsAcrossRestart(t *testing.T) {
 	defer restarted.Close()
 	defer closeRestartedStore()
 
-	decodeIntegrationURL(t, restarted.URL, shortURL, originalURL)
+	resolveIntegrationURL(t, restarted.URL, shortURL, originalURL)
+	redirectIntegrationURL(t, restarted.URL, shortURL, originalURL)
 }
 
 func startIntegrationServer(t *testing.T, dbPath string, baseURL string) (*httptest.Server, func()) {
@@ -72,7 +75,7 @@ func encodeIntegrationURL(t *testing.T, baseURL string, originalURL string) stri
 	return response.ShortURL
 }
 
-func decodeIntegrationURL(t *testing.T, baseURL string, shortURL string, wantOriginalURL string) {
+func resolveIntegrationURL(t *testing.T, baseURL string, shortURL string, wantOriginalURL string) {
 	t.Helper()
 
 	body := map[string]string{"short_url": shortURL}
@@ -83,6 +86,33 @@ func decodeIntegrationURL(t *testing.T, baseURL string, shortURL string, wantOri
 
 	if response.URL != wantOriginalURL {
 		t.Fatalf("decoded URL = %q; want %q", response.URL, wantOriginalURL)
+	}
+}
+
+func redirectIntegrationURL(t *testing.T, serverURL string, shortURL string, wantOriginalURL string) {
+	t.Helper()
+
+	parsedShortURL, err := url.Parse(shortURL)
+	if err != nil {
+		t.Fatalf("parse short URL: %v", err)
+	}
+
+	client := &http.Client{
+		CheckRedirect: func(*http.Request, []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
+	response, err := client.Get(serverURL + parsedShortURL.Path)
+	if err != nil {
+		t.Fatalf("get redirect path: %v", err)
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode != http.StatusFound {
+		t.Fatalf("redirect status = %d; want %d", response.StatusCode, http.StatusFound)
+	}
+	if response.Header.Get("Location") != wantOriginalURL {
+		t.Fatalf("redirect location = %q; want %q", response.Header.Get("Location"), wantOriginalURL)
 	}
 }
 

@@ -64,7 +64,7 @@ func TestServiceReturnsExistingURLWhenConcurrentInsertCreatesOriginalURL(t *test
 	}
 }
 
-func TestServiceDecodeReturnsOriginalURL(t *testing.T) {
+func TestServiceResolveShortURLReturnsOriginalURL(t *testing.T) {
 	store := newMemoryStore()
 	service := newTestService(t, store, "Ab3dE9xY")
 
@@ -73,9 +73,28 @@ func TestServiceDecodeReturnsOriginalURL(t *testing.T) {
 		t.Fatalf("encode URL: %v", err)
 	}
 
-	originalURL, err := service.Decode(context.Background(), shortURL)
+	originalURL, err := service.ResolveShortURL(context.Background(), shortURL)
 	if err != nil {
-		t.Fatalf("decode short URL: %v", err)
+		t.Fatalf("resolve short URL: %v", err)
+	}
+
+	if originalURL != "https://example.com/articles/1" {
+		t.Fatalf("original URL = %q; want %q", originalURL, "https://example.com/articles/1")
+	}
+}
+
+func TestServiceResolveCodeReturnsOriginalURL(t *testing.T) {
+	store := newMemoryStore()
+	store.mustInsert(t, Link{
+		Code:        "Ab3dE9xY",
+		OriginalURL: "https://example.com/articles/1",
+		CreatedAt:   time.Now().UTC(),
+	})
+	service := newTestService(t, store)
+
+	originalURL, err := service.ResolveCode(context.Background(), "Ab3dE9xY")
+	if err != nil {
+		t.Fatalf("resolve code: %v", err)
 	}
 
 	if originalURL != "https://example.com/articles/1" {
@@ -163,9 +182,9 @@ func TestServiceRejectsInvalidShortURLs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := service.Decode(context.Background(), tt.shortURL)
+			_, err := service.ResolveShortURL(context.Background(), tt.shortURL)
 			if !errors.Is(err, ErrInvalidShortURL) {
-				t.Fatalf("decode error = %v; want %v", err, ErrInvalidShortURL)
+				t.Fatalf("resolve short URL error = %v; want %v", err, ErrInvalidShortURL)
 			}
 		})
 	}
@@ -174,9 +193,18 @@ func TestServiceRejectsInvalidShortURLs(t *testing.T) {
 func TestServiceReturnsNotFoundForUnknownCode(t *testing.T) {
 	service := newTestService(t, newMemoryStore(), "Ab3dE9xY")
 
-	_, err := service.Decode(context.Background(), "http://localhost:8080/Ab3dE9xY")
+	_, err := service.ResolveShortURL(context.Background(), "http://localhost:8080/Ab3dE9xY")
 	if !errors.Is(err, ErrNotFound) {
-		t.Fatalf("decode error = %v; want %v", err, ErrNotFound)
+		t.Fatalf("resolve short URL error = %v; want %v", err, ErrNotFound)
+	}
+}
+
+func TestServiceRejectsInvalidCode(t *testing.T) {
+	service := newTestService(t, newMemoryStore())
+
+	_, err := service.ResolveCode(context.Background(), "not-ok!!")
+	if !errors.Is(err, ErrInvalidShortURL) {
+		t.Fatalf("resolve code error = %v; want %v", err, ErrInvalidShortURL)
 	}
 }
 

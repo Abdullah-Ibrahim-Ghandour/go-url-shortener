@@ -106,6 +106,21 @@ Example response:
 }
 ```
 
+## Follow A Short URL
+
+Open the returned `short_url` in a browser, or inspect the redirect with:
+
+```sh
+curl -I http://localhost:8080/Ab3dE9xY
+```
+
+Example response headers:
+
+```http
+HTTP/1.1 302 Found
+Location: https://codesubmit.io/library/react
+```
+
 ## Verify Persistence
 
 1. Start the server:
@@ -120,9 +135,9 @@ Example response:
 
 4. Start the server again with the same `SHORTLINK_DB_PATH`.
 
-5. Decode the saved `short_url` with `/decode`.
+5. Decode the saved `short_url` with `/decode`, or open it in a browser.
 
-The decode response should still return the original URL because mappings are stored in SQLite.
+The decode response should still return the original URL, and the short URL should still redirect, because mappings are stored in SQLite.
 
 ## Run Tests
 
@@ -141,7 +156,7 @@ go build ./...
 The tests include:
 
 - service unit tests
-- HTTP handler tests for `/encode` and `/decode`
+- HTTP handler tests for `/encode`, `/decode`, and `GET /{code}`
 - SQLite storage integration tests
 - endpoint integration coverage through `httptest.Server`
 

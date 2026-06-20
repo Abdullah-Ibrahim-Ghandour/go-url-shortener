@@ -29,9 +29,9 @@ func TestEncodeReturnsShortURL(t *testing.T) {
 	assertJSON(t, response, map[string]string{"short_url": "http://localhost:8080/Ab3dE9xY"})
 }
 
-func TestDecodeReturnsOriginalURL(t *testing.T) {
+func TestDecodeEndpointReturnsOriginalURL(t *testing.T) {
 	handler := NewHandler(fakeShortener{
-		decode: func(_ context.Context, rawShortURL string) (string, error) {
+		resolveShortURL: func(_ context.Context, rawShortURL string) (string, error) {
 			if rawShortURL != "http://localhost:8080/Ab3dE9xY" {
 				t.Fatalf("short URL = %q; want %q", rawShortURL, "http://localhost:8080/Ab3dE9xY")
 			}
@@ -46,6 +46,24 @@ func TestDecodeReturnsOriginalURL(t *testing.T) {
 	assertJSON(t, response, map[string]string{"url": "https://example.com/articles/1"})
 }
 
+func TestRedirectReturnsFound(t *testing.T) {
+	handler := NewHandler(fakeShortener{
+		resolveCode: func(_ context.Context, code string) (string, error) {
+			if code != "Ab3dE9xY" {
+				t.Fatalf("code = %q; want %q", code, "Ab3dE9xY")
+			}
+			return "https://example.com/articles/1", nil
+		},
+	})
+
+	response := serve(handler, http.MethodGet, "/Ab3dE9xY", "")
+
+	assertStatus(t, response, http.StatusFound)
+	if response.Header().Get("Location") != "https://example.com/articles/1" {
+		t.Fatalf("location = %q; want %q", response.Header().Get("Location"), "https://example.com/articles/1")
+	}
+}
+
 func TestRejectsWrongMethod(t *testing.T) {
 	handler := NewHandler(fakeShortener{})
 
@@ -56,6 +74,41 @@ func TestRejectsWrongMethod(t *testing.T) {
 	assertJSON(t, response, map[string]string{"error": "method_not_allowed"})
 	if response.Header().Get("Allow") != http.MethodPost {
 		t.Fatalf("allow header = %q; want %q", response.Header().Get("Allow"), http.MethodPost)
+	}
+}
+
+func TestRedirectRejectsWrongMethod(t *testing.T) {
+	handler := NewHandler(fakeShortener{})
+
+	response := serve(handler, http.MethodPost, "/Ab3dE9xY", "")
+
+	assertStatus(t, response, http.StatusMethodNotAllowed)
+	assertContentType(t, response)
+	assertJSON(t, response, map[string]string{"error": "method_not_allowed"})
+	if response.Header().Get("Allow") != http.MethodGet {
+		t.Fatalf("allow header = %q; want %q", response.Header().Get("Allow"), http.MethodGet)
+	}
+}
+
+func TestRedirectRejectsInvalidPaths(t *testing.T) {
+	handler := NewHandler(fakeShortener{})
+
+	tests := []struct {
+		name string
+		path string
+	}{
+		{name: "root", path: "/"},
+		{name: "nested path", path: "/Ab3dE9xY/extra"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			response := serve(handler, http.MethodGet, tt.path, "")
+
+			assertStatus(t, response, http.StatusNotFound)
+			assertContentType(t, response)
+			assertJSON(t, response, map[string]string{"error": "not_found"})
+		})
 	}
 }
 
@@ -92,6 +145,7 @@ func TestRejectsInvalidRequests(t *testing.T) {
 func TestMapsServiceErrors(t *testing.T) {
 	tests := []struct {
 		name       string
+		method     string
 		path       string
 		body       string
 		service    fakeShortener
@@ -99,9 +153,10 @@ func TestMapsServiceErrors(t *testing.T) {
 		wantError  string
 	}{
 		{
-			name: "invalid original URL",
-			path: "/encode",
-			body: `{"url":"ftp://example.com/file"}`,
+			name:   "invalid original URL",
+			method: http.MethodPost,
+			path:   "/encode",
+			body:   `{"url":"ftp://example.com/file"}`,
 			service: fakeShortener{
 				encode: func(context.Context, string) (string, error) {
 					return "", shortener.ErrInvalidURL
@@ -111,11 +166,12 @@ func TestMapsServiceErrors(t *testing.T) {
 			wantError:  "invalid_url",
 		},
 		{
-			name: "invalid short URL",
-			path: "/decode",
-			body: `{"short_url":"http://example.com/Ab3dE9xY"}`,
+			name:   "invalid short URL",
+			method: http.MethodPost,
+			path:   "/decode",
+			body:   `{"short_url":"http://example.com/Ab3dE9xY"}`,
 			service: fakeShortener{
-				decode: func(context.Context, string) (string, error) {
+				resolveShortURL: func(context.Context, string) (string, error) {
 					return "", shortener.ErrInvalidShortURL
 				},
 			},
@@ -123,11 +179,12 @@ func TestMapsServiceErrors(t *testing.T) {
 			wantError:  "invalid_short_url",
 		},
 		{
-			name: "unknown code",
-			path: "/decode",
-			body: `{"short_url":"http://localhost:8080/Ab3dE9xY"}`,
+			name:   "unknown code",
+			method: http.MethodPost,
+			path:   "/decode",
+			body:   `{"short_url":"http://localhost:8080/Ab3dE9xY"}`,
 			service: fakeShortener{
-				decode: func(context.Context, string) (string, error) {
+				resolveShortURL: func(context.Context, string) (string, error) {
 					return "", shortener.ErrNotFound
 				},
 			},
@@ -135,9 +192,10 @@ func TestMapsServiceErrors(t *testing.T) {
 			wantError:  "not_found",
 		},
 		{
-			name: "internal encode error",
-			path: "/encode",
-			body: `{"url":"https://example.com"}`,
+			name:   "internal encode error",
+			method: http.MethodPost,
+			path:   "/encode",
+			body:   `{"url":"https://example.com"}`,
 			service: fakeShortener{
 				encode: func(context.Context, string) (string, error) {
 					return "", errors.New("database offline")
@@ -146,12 +204,38 @@ func TestMapsServiceErrors(t *testing.T) {
 			wantStatus: http.StatusInternalServerError,
 			wantError:  "internal_error",
 		},
+		{
+			name:   "redirect invalid code",
+			method: http.MethodGet,
+			path:   "/not-ok!!",
+			body:   "",
+			service: fakeShortener{
+				resolveCode: func(context.Context, string) (string, error) {
+					return "", shortener.ErrInvalidShortURL
+				},
+			},
+			wantStatus: http.StatusBadRequest,
+			wantError:  "invalid_short_url",
+		},
+		{
+			name:   "redirect unknown code",
+			method: http.MethodGet,
+			path:   "/Ab3dE9xY",
+			body:   "",
+			service: fakeShortener{
+				resolveCode: func(context.Context, string) (string, error) {
+					return "", shortener.ErrNotFound
+				},
+			},
+			wantStatus: http.StatusNotFound,
+			wantError:  "not_found",
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			handler := NewHandler(tt.service)
-			response := serve(handler, http.MethodPost, tt.path, tt.body)
+			response := serve(handler, tt.method, tt.path, tt.body)
 
 			assertStatus(t, response, tt.wantStatus)
 			assertContentType(t, response)
@@ -161,8 +245,9 @@ func TestMapsServiceErrors(t *testing.T) {
 }
 
 type fakeShortener struct {
-	encode func(ctx context.Context, rawURL string) (string, error)
-	decode func(ctx context.Context, rawShortURL string) (string, error)
+	encode          func(ctx context.Context, rawURL string) (string, error)
+	resolveShortURL func(ctx context.Context, rawShortURL string) (string, error)
+	resolveCode     func(ctx context.Context, code string) (string, error)
 }
 
 func (s fakeShortener) Encode(ctx context.Context, rawURL string) (string, error) {
@@ -173,12 +258,20 @@ func (s fakeShortener) Encode(ctx context.Context, rawURL string) (string, error
 	return s.encode(ctx, rawURL)
 }
 
-func (s fakeShortener) Decode(ctx context.Context, rawShortURL string) (string, error) {
-	if s.decode == nil {
-		return "", errors.New("unexpected decode call")
+func (s fakeShortener) ResolveShortURL(ctx context.Context, rawShortURL string) (string, error) {
+	if s.resolveShortURL == nil {
+		return "", errors.New("unexpected resolve short URL call")
 	}
 
-	return s.decode(ctx, rawShortURL)
+	return s.resolveShortURL(ctx, rawShortURL)
+}
+
+func (s fakeShortener) ResolveCode(ctx context.Context, code string) (string, error) {
+	if s.resolveCode == nil {
+		return "", errors.New("unexpected resolve code call")
+	}
+
+	return s.resolveCode(ctx, code)
 }
 
 func serve(handler http.Handler, method string, path string, body string) *httptest.ResponseRecorder {

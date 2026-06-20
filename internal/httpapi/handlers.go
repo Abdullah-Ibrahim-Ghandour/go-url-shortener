@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"strings"
 
 	"go-url-shortener/internal/shortener"
 )
@@ -14,7 +15,8 @@ const maxRequestBodyBytes = 16 * 1024
 
 type Shortener interface {
 	Encode(ctx context.Context, rawURL string) (string, error)
-	Decode(ctx context.Context, rawShortURL string) (string, error)
+	ResolveShortURL(ctx context.Context, rawShortURL string) (string, error)
+	ResolveCode(ctx context.Context, code string) (string, error)
 }
 
 type Handler struct {
@@ -27,6 +29,7 @@ func NewHandler(shortener Shortener) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/encode", handler.encode)
 	mux.HandleFunc("/decode", handler.decode)
+	mux.HandleFunc("/", handler.redirect)
 
 	return mux
 }
@@ -75,7 +78,7 @@ func (h *Handler) decode(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	originalURL, err := h.shortener.Decode(r.Context(), *request.ShortURL)
+	originalURL, err := h.shortener.ResolveShortURL(r.Context(), *request.ShortURL)
 	if err != nil {
 		status, code := errorResponse(err)
 		writeError(w, status, code)
@@ -83,6 +86,29 @@ func (h *Handler) decode(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, map[string]string{"url": originalURL})
+}
+
+func (h *Handler) redirect(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		w.Header().Set("Allow", http.MethodGet)
+		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed")
+		return
+	}
+
+	code := strings.TrimPrefix(r.URL.Path, "/")
+	if code == "" || strings.Contains(code, "/") {
+		writeError(w, http.StatusNotFound, "not_found")
+		return
+	}
+
+	originalURL, err := h.shortener.ResolveCode(r.Context(), code)
+	if err != nil {
+		status, code := errorResponse(err)
+		writeError(w, status, code)
+		return
+	}
+
+	http.Redirect(w, r, originalURL, http.StatusFound)
 }
 
 func requirePost(w http.ResponseWriter, r *http.Request) bool {

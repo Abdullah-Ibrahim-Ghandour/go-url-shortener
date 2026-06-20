@@ -104,10 +104,18 @@ func (s *Service) Encode(ctx context.Context, rawURL string) (string, error) {
 	return "", ErrCodeExhausted
 }
 
-func (s *Service) Decode(ctx context.Context, rawShortURL string) (string, error) {
+func (s *Service) ResolveShortURL(ctx context.Context, rawShortURL string) (string, error) {
 	code, err := s.codeFromShortURL(rawShortURL)
 	if err != nil {
 		return "", err
+	}
+
+	return s.ResolveCode(ctx, code)
+}
+
+func (s *Service) ResolveCode(ctx context.Context, code string) (string, error) {
+	if !isValidCode(code) {
+		return "", ErrInvalidShortURL
 	}
 
 	link, err := s.store.FindByCode(ctx, code)
