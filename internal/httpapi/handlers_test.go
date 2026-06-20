@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"go-url-shortener/internal/shortener"
+	"github.com/Abdullah-Ibrahim-Ghandour/go-url-shortener/internal/shortener"
 )
 
 func TestEncodeReturnsShortURL(t *testing.T) {

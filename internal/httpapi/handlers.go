@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"strings"
 
-	"go-url-shortener/internal/shortener"
+	"github.com/Abdullah-Ibrahim-Ghandour/go-url-shortener/internal/shortener"
 )
 
 const maxRequestBodyBytes = 16 * 1024

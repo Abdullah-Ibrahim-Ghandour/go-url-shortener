@@ -11,8 +11,8 @@ import (
 	"strings"
 	"testing"
 
-	"go-url-shortener/internal/shortener"
-	"go-url-shortener/internal/storage"
+	"github.com/Abdullah-Ibrahim-Ghandour/go-url-shortener/internal/shortener"
+	"github.com/Abdullah-Ibrahim-Ghandour/go-url-shortener/internal/storage"
 )
 
 func TestEncodeDecodeAndRedirectIntegrationPersistsAcrossRestart(t *testing.T) {

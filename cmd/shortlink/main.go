@@ -9,9 +9,9 @@ import (
 	"path/filepath"
 	"time"
 
-	"go-url-shortener/internal/httpapi"
-	"go-url-shortener/internal/shortener"
-	"go-url-shortener/internal/storage"
+	"github.com/Abdullah-Ibrahim-Ghandour/go-url-shortener/internal/httpapi"
+	"github.com/Abdullah-Ibrahim-Ghandour/go-url-shortener/internal/shortener"
+	"github.com/Abdullah-Ibrahim-Ghandour/go-url-shortener/internal/storage"
 )
 
 const (

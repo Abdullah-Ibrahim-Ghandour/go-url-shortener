@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"go-url-shortener/internal/shortener"
+	"github.com/Abdullah-Ibrahim-Ghandour/go-url-shortener/internal/shortener"
 
 	_ "modernc.org/sqlite"
 )

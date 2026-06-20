@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"go-url-shortener/internal/shortener"
+	"github.com/Abdullah-Ibrahim-Ghandour/go-url-shortener/internal/shortener"
 )
 
 func TestSQLiteStoreInsertsAndFindsLink(t *testing.T) {
